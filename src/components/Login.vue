@@ -15,7 +15,8 @@
         <button type="submit">Login</button>
       </form>
     </div>
-    <router-link to="/sign_up" class="admin-link">Admin Login</router-link>
+    <router-link to="/sign_up" class="admin-link">Sign Up</router-link>
+    <router-link to="/admin_login" class="admin-link">Admin Login</router-link>
   </div>
 </template>
   
@@ -50,11 +51,18 @@ export default {
             }
         )
         .then((response) => {
-            console.log(response.data);
-            if (response.status === 200 && response.data.authenticated) {
-                this.$router.push("/home");
-            }
-        })
+    console.log(response.data);
+    if (response.status === 200 && response.data.authenticated) {
+        // Save the JWT token to localStorage
+        localStorage.setItem('token', response.data.access_token);
+
+        // Navigate to the home page with the username as a query parameter
+        this.$router.push({ path: '/home', query: { username: this.username } });
+    } else {
+        // Handle authentication failure
+        console.error('Authentication failed:', response.data.message);
+    }
+})
         .catch((error) => {
             console.error("Error:", error);
         });
