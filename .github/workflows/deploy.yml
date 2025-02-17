@@ -22,9 +22,9 @@ jobs:
 
       - name: Deploy CloudFormation Stack
         run: |
-          aws cloudformation deploy \
+          aws cloudformation create-stack \
             --stack-name VueAppStack \
-            --template-file cloudformation/cloudformation.yaml \
+            --template-body file://cloudformation/cloudformation.yaml \
             --capabilities CAPABILITY_NAMED_IAM
 
       - name: Install Node.js
