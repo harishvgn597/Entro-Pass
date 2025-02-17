@@ -1,75 +1,51 @@
-name: Deploy Vue to AWS (S3 + CloudFormation)
+name: Deploy Vue App to AWS
 
 on:
   push:
     branches:
-      - develop
+      - develop  # Runs when changes are pushed to the develop branch
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Install Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-
-      - name: Install dependencies and build Vue app
-        run: |
-          npm install
-          npm run build
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Check if CloudFormation stack exists
-        id: check_stack
-        continue-on-error: true
+      - name: Deploy CloudFormation Stack
         run: |
-          STACK_NAME="vue-s3-deployment"
-          if aws cloudformation describe-stacks --stack-name $STACK_NAME > /dev/null 2>&1; then
-            echo "STACK_EXISTS=true" >> $GITHUB_ENV
-          else
-            echo "STACK_EXISTS=false" >> $GITHUB_ENV
-          fi
+          aws cloudformation create-stack \
+            --stack-name VueAppStack \
+            --template-body file://cloudformation/cloudformation.yaml \
+            --capabilities CAPABILITY_NAMED_IAM
 
-      - name: Deploy CloudFormation Stack (Create or Update)
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Vue App
+        run: npm run build
+
+      - name: Deploy Vue App to S3
         run: |
-          STACK_NAME="vue-s3-deployment"
-          BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}"
-          DISTRIBUTION_ID="${{ secrets.DISTRIBUTION_ID }}"
+          # Use the secret for S3 bucket name
+          aws s3 sync dist/ s3://$S3_BUCKET_NAME --delete
+        env:
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}  # Reference the secret here
 
-          if [ "$STACK_EXISTS" == "true" ]; then
-            echo "Updating existing stack..."
-            aws cloudformation deploy \
-              --stack-name $STACK_NAME \
-              --template-file cloudformation/cloudformation.yaml \
-              --capabilities CAPABILITY_NAMED_IAM \
-              --parameter-overrides S3BucketName=$BUCKET_NAME CloudFrontDistributionId=$DISTRIBUTION_ID
-          else
-            echo "Creating new stack..."
-            aws cloudformation create-stack \
-              --stack-name $STACK_NAME \
-              --template-body file://cloudformation/cloudformation.yaml \
-              --capabilities CAPABILITY_NAMED_IAM \
-              --parameters ParameterKey=S3BucketName,ParameterValue=$BUCKET_NAME ParameterKey=CloudFrontDistributionId,ParameterValue=$DISTRIBUTION_ID
-            aws cloudformation wait stack-create-complete --stack-name $STACK_NAME
-          fi
-
-      - name: Sync Vue build to S3 (Override if Exists)
+      - name: Invalidate CloudFront Cache
         run: |
-          BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}"
-          aws s3 sync dist/ "s3://$BUCKET_NAME" --delete
-
-      - name: Invalidate CloudFront cache (if applicable)
-        run: |
-          DISTRIBUTION_ID="${{ secrets.DISTRIBUTION_ID }}"
-          aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"
+          # Use the secret for CloudFront Distribution ID
+          aws cloudfront create-invalidation --distribution-id ${{ secrets.DISTRIBUTION_ID }} --paths "/*"
