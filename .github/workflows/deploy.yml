@@ -3,7 +3,7 @@ name: Deploy Vue App to AWS
 on:
   push:
     branches:
-      - develop  # Runs when changes are pushed to main branch
+      - develop  # Runs when changes are pushed to the develop branch
 
 jobs:
   deploy:
@@ -41,14 +41,15 @@ jobs:
       - name: Get CloudFormation Outputs
         id: get-outputs
         run: |
-          S3_BUCKET=$(aws cloudformation describe-stacks --stack-name VueAppStack --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text)
           DISTRIBUTION_ID=$(aws cloudformation describe-stacks --stack-name VueAppStack --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text)
-          echo "S3_BUCKET=$S3_BUCKET" >> $GITHUB_ENV
           echo "DISTRIBUTION_ID=$DISTRIBUTION_ID" >> $GITHUB_ENV
 
       - name: Deploy Vue App to S3
         run: |
-          aws s3 sync dist/ s3://$S3_BUCKET --delete
+          # Use the secret for S3 bucket name
+          aws s3 sync dist/ s3://$S3_BUCKET_NAME --delete
+        env:
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}  # Reference the secret here
 
       - name: Invalidate CloudFront Cache
         run: |
