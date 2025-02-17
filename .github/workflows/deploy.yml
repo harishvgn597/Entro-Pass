@@ -29,6 +29,19 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Check & Create S3 Bucket if Missing
+        run: |
+          BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+          REGION=${{ secrets.AWS_REGION }}
+
+          if aws s3 ls "s3://$BUCKET_NAME" 2>&1 | grep -q 'NoSuchBucket'; then
+            echo "Bucket does not exist. Creating..."
+            aws s3api create-bucket --bucket $BUCKET_NAME --region $REGION --create-bucket-configuration LocationConstraint=$REGION
+            echo "Bucket created."
+          else
+            echo "Bucket exists. Proceeding with deployment."
+          fi
 
       - name: Deploy to S3
         run: |
