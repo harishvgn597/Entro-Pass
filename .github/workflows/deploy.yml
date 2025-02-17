@@ -1,33 +1,18 @@
-name: Deploy Vue App to AWS
+name: Deploy Vue to S3 via CloudFormation
 
 on:
   push:
     branches:
-      - develop  # Runs when changes are pushed to the develop branch
+      - develop
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Deploy CloudFormation Stack
-        run: |
-          aws cloudformation create-stack \
-            --stack-name VueAppStack \
-            --template-body file://cloudformation/cloudformation.yaml \
-            --capabilities CAPABILITY_NAMED_IAM
-
-      - name: Install Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 20
@@ -35,17 +20,50 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Build Vue App
+      - name: Build Vue Project
         run: npm run build
 
-      - name: Deploy Vue App to S3
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to S3
         run: |
-          # Use the secret for S3 bucket name
-          aws s3 sync dist/ s3://$S3_BUCKET_NAME --delete
-        env:
-          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}  # Reference the secret here
+          aws s3 sync dist s3://${{ secrets.S3_BUCKET_NAME }} --delete
+
+      - name: Deploy CloudFormation Stack
+        run: |
+          STACK_NAME="vue-s3-deployment"
+
+          # Check if the stack exists
+          if aws cloudformation describe-stacks --stack-name $STACK_NAME > /dev/null 2>&1; then
+            echo "Stack exists, updating..."
+            aws cloudformation deploy \
+              --stack-name $STACK_NAME \
+              --template-file cloudformation-template.yaml \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --parameter-overrides S3BucketName=${{ secrets.S3_BUCKET_NAME }}
+          else
+            echo "Stack does not exist, creating..."
+            aws cloudformation create-stack \
+              --stack-name $STACK_NAME \
+              --template-body file://cloudformation-template.yaml \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --parameters ParameterKey=S3BucketName,ParameterValue=${{ secrets.S3_BUCKET_NAME }}
+            echo "Waiting for stack creation to complete..."
+            aws cloudformation wait stack-create-complete --stack-name $STACK_NAME
+          fi
 
       - name: Invalidate CloudFront Cache
         run: |
-          # Use the secret for CloudFront Distribution ID
-          aws cloudfront create-invalidation --distribution-id ${{ secrets.DISTRIBUTION_ID }} --paths "/*"
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.DISTRIBUTION_ID }} \
+            --paths "/*"
+
+      - name: Get S3 Website URL
+        run: |
+          WEBSITE_URL=$(aws cloudformation describe-stacks --stack-name vue-s3-deployment --query "Stacks[0].Outputs[?OutputKey=='WebsiteURL'].OutputValue" --output text)
+          echo "S3 Website URL: $WEBSITE_URL"

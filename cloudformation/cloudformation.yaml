@@ -1,70 +1,31 @@
 AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  S3BucketName:
+    Type: String
+    Description: Name of the S3 bucket for Vue deployment
 
 Resources:
-  S3Bucket:
+  VueS3Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: my-vue-app-bucket456
+      BucketName: !Ref S3BucketName
       WebsiteConfiguration:
         IndexDocument: index.html
-        ErrorDocument: error.html
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
+        ErrorDocument: index.html
 
-  S3BucketPolicy:
+  VueS3BucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref S3Bucket
+      Bucket: !Ref VueS3Bucket
       PolicyDocument:
-        Version: "2012-10-17"
         Statement:
           - Effect: Allow
-            Principal: "*"
-            Action: "s3:GetObject"
-            Resource: !Sub "arn:aws:s3:::${S3Bucket}/*"
-            Condition:
-              StringEquals:
-                "aws:Referer": "YOUR_CLOUDFRONT_REFERRER"
-
-  CloudFrontOAI:
-    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
-    Properties:
-      CloudFrontOriginAccessIdentityConfig:
-        Comment: "OAI for Vue S3 Hosting"
-
-  CloudFrontDistribution:
-    Type: AWS::CloudFront::Distribution
-    Properties:
-      DistributionConfig:
-        Enabled: true
-        DefaultRootObject: index.html
-        Origins:
-          - DomainName: !GetAtt S3Bucket.DomainName
-            Id: S3Origin
-            S3OriginConfig:
-              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOAI}"
-        DefaultCacheBehavior:
-          TargetOriginId: S3Origin
-          ViewerProtocolPolicy: redirect-to-https
-          AllowedMethods: 
-            - GET
-            - HEAD
-          CachedMethods: 
-            - GET
-            - HEAD
-          ForwardedValues:
-            QueryString: false
-        PriceClass: PriceClass_100
-        ViewerCertificate:
-          CloudFrontDefaultCertificate: true
+            Principal: '*'
+            Action: 
+              - s3:GetObject
+            Resource: !Sub arn:aws:s3:::${VueS3Bucket}/*
 
 Outputs:
-  S3BucketName:
-    Description: "Name of the S3 bucket"
-    Value: !Ref S3Bucket
-  CloudFrontURL:
-    Description: "URL of the CloudFront distribution"
-    Value: !Sub "https://${CloudFrontDistribution.DomainName}"
+  WebsiteURL:
+    Description: S3 Static Website URL
+    Value: !Sub "http://${VueS3Bucket}.s3-website-${AWS::Region}.amazonaws.com"
