@@ -44,14 +44,14 @@ jobs:
             echo "Stack exists, updating..."
             aws cloudformation deploy \
               --stack-name $STACK_NAME \
-              --template-file cloudformation.yaml \
+              --template-file cloudformation/cloudformation.yaml \
               --capabilities CAPABILITY_NAMED_IAM \
               --parameter-overrides S3BucketName=${{ secrets.S3_BUCKET_NAME }}
           else
             echo "Stack does not exist, creating..."
             aws cloudformation create-stack \
               --stack-name $STACK_NAME \
-              --template-body file://cloudformation.yaml \
+              --template-body file://cloudformation/cloudformation.yaml \
               --capabilities CAPABILITY_NAMED_IAM \
               --parameters ParameterKey=S3BucketName,ParameterValue=${{ secrets.S3_BUCKET_NAME }}
             echo "Waiting for stack creation to complete..."
