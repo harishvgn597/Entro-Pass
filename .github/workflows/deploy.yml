@@ -38,12 +38,6 @@ jobs:
       - name: Build Vue App
         run: npm run build
 
-      - name: Get CloudFormation Outputs
-        id: get-outputs
-        run: |
-          DISTRIBUTION_ID=$(aws cloudformation describe-stacks --stack-name VueAppStack --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text)
-          echo "DISTRIBUTION_ID=$DISTRIBUTION_ID" >> $GITHUB_ENV
-
       - name: Deploy Vue App to S3
         run: |
           # Use the secret for S3 bucket name
@@ -53,4 +47,5 @@ jobs:
 
       - name: Invalidate CloudFront Cache
         run: |
-          aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"
+          # Use the secret for CloudFront Distribution ID
+          aws cloudfront create-invalidation --distribution-id ${{ secrets.DISTRIBUTION_ID }} --paths "/*"
