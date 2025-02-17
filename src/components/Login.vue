@@ -1,6 +1,6 @@
 <template>
   <div class="login-container">
-    <h1>Welcome to Our EntroPass App!</h1>
+    <h1>Welcome to Our EntroPass App Harish!</h1>
     <div class="login-form">
       <h2>User Login</h2>
       <form @submit.prevent="login">
